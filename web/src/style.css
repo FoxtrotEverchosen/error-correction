@@ -42,6 +42,10 @@ h3 { font-size: .95rem; margin: 0 0 .5rem; }
 
 .bit.parity { border-color: var(--parity); }
 
+.bit.fail { background: color-mix(in srgb, var(--warn) 20%, var(--panel)); }
+
+.grid { display: grid; gap: .4rem; width: max-content; margin-bottom: .5rem; }
+
 .bit.flipped { background: color-mix(in srgb, var(--bad) 25%, var(--panel)); }
 
 .bit.highlight { outline: 3px solid var(--ok); }
@@ -52,7 +56,7 @@ h3 { font-size: .95rem; margin: 0 0 .5rem; }
 
 .bit-value { font: 1.3rem ui-monospace, monospace; }
 
-.bit-label { font-size: .7rem; color: var(--muted); }
+.bit-label { font-size: .7rem; color: var(--muted); min-height: 1em;}
 
 .badge { display: inline-block; padding: .15rem .6rem; border-radius: 999px; font-size: .85rem; font-weight: 600; color: #fff; }
 

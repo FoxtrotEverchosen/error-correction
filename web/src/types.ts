@@ -20,3 +20,36 @@ export interface HammingTrace {
   decoded: boolean[];
   decoded_correctly: boolean;
 }
+
+export type ParityVerdict = { kind: "no_error_detected" } | { kind: "error_detected" };
+
+export interface ParityTrace {
+  data: boolean[];
+  parity_bit: boolean;
+  codeword: boolean[];
+  received: boolean[];
+  flipped: number[];
+  ones_received: number;
+  verdict: ParityVerdict;
+  undetected_error: boolean;
+}
+
+export type Parity2dVerdict =
+  | { kind: "no_error_detected" }
+  | { kind: "corrected"; row: number; col: number }
+  | { kind: "uncorrectable" };
+
+export interface Parity2dTrace {
+  rows: number;
+  cols: number;
+  data: boolean[];
+  codeword: boolean[];
+  received: boolean[];
+  flipped: number[];
+  failing_rows: number[];
+  failing_cols: number[];
+  verdict: Parity2dVerdict;
+  corrected: boolean[];
+  decoded: boolean[];
+  decoded_correctly: boolean;
+}

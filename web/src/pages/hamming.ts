@@ -1,6 +1,6 @@
 import { channelBsc, channelBurst, runHamming } from "../core";
 import type { HammingTrace } from "../types";
-import { badge, bitRow, el, section, type BitCell, type Tone } from "../components";
+import { badge, bitRow, el, section, channelPanel, newChannelState, type BitCell, type Tone } from "../components";
 import type { Page } from "./page";
 
 const bits = (b: boolean[]) => b.map((x) => (x ? "1" : "0")).join("");
@@ -28,10 +28,7 @@ export const hammingPage: Page = {
     const data = [true, false, true, true];
     const flips = new Set<number>();
     let extended = false;
-    let ber = 0.1;
-    let burstLen = 3;
-    let seed = 1n;
-    const nextSeed = () => { seed = BigInt(Math.floor(Math.random() * 2 ** 32)) + 1n; };
+    const channelState = newChannelState();
 
     const draw = () => {
       let t: HammingTrace;
@@ -65,35 +62,11 @@ export const hammingPage: Page = {
         reset,
       );
 
-      const berInput = el("input");
-      berInput.type = "number";
-      berInput.min = "0"; berInput.max = "1"; berInput.step = "0.01";
-      berInput.value = String(ber);
-      berInput.addEventListener("change", () => { ber = Number(berInput.value); });
-
-      const burstInput = el("input");
-      burstInput.type = "number";
-      burstInput.min = "1"; burstInput.max = "8"; burstInput.step = "1";
-      burstInput.value = String(burstLen);
-      burstInput.addEventListener("change", () => { burstLen = Number(burstInput.value); });
-
-      const len = extended ? 8 : 7;
-      const apply = (zeroIndexed: number[]) => {
+      const channelControls = channelPanel(channelState, extended ? 8 : 7, (zeroIndexed) => {
         flips.clear();
-        zeroIndexed.forEach((i) => flips.add(i + 1)); // Hamming is 1-indexed
+        zeroIndexed.forEach((i) => flips.add(i + 1)); // Hamming positions are 1-indexed
         draw();
-      };
-      const randomBtn = el("button", { text: "Random errors" });
-      randomBtn.addEventListener("click", () => { nextSeed(); apply(channelBsc(len, ber, seed)); });
-      const burstBtn = el("button", { text: "Burst" });
-      burstBtn.addEventListener("click", () => { nextSeed(); apply(channelBurst(len, burstLen, seed)); });
-
-      const channel = section(
-        "Noisy channel (seeded)",
-        el("label", { class: "option" }, ["Bit error rate: ", berInput, " ", randomBtn]),
-        el("label", { class: "option" }, ["Burst length: ", burstInput, " ", burstBtn]),
-        el("p", { class: "note", text: `Last seed: ${seed}` }),
-      );
+      });
 
       // --- Sent / received ---
       const sent = bitRow(
@@ -169,7 +142,7 @@ export const hammingPage: Page = {
       container.replaceChildren(
         el("h2", { text: "Hamming code" }),
         controls,
-        channel,
+        channelControls,
         section("2. Sent codeword (blue = data, orange = parity)", sent),
         section("3. Received (click a bit to flip it, as the channel would)", received),
         section(

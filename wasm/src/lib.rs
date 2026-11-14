@@ -1,7 +1,6 @@
 use wasm_bindgen::prelude::*;
 use ecc_core::utils::Xorshift64Star;
-use ecc_core::hamming;
-use ecc_core::channel;
+use ecc_core::{hamming, channel, parity};
 use serde::Serialize;
 
 /// Serialize into plain JS objects (not `Map`s), with `None` as `null`.
@@ -35,4 +34,18 @@ pub fn channel_burst(len: u32, burst_len: u32, seed: u64) -> Vec<u32> {
         .into_iter()
         .map(|p| p as u32)
         .collect()
+}
+
+#[wasm_bindgen]
+pub fn parity_run(data: Vec<u8>, flips: Vec<u32>) -> Result<JsValue, JsError> {
+    let data: Vec<bool> = data.into_iter().map(|b| b != 0).collect();
+    let flips: Vec<usize> = flips.into_iter().map(|p| p as usize).collect();
+    to_js(&parity::parity_run(&data, &flips)?)
+}
+
+#[wasm_bindgen]
+pub fn parity2d_run(data: Vec<u8>, rows: u32, cols: u32, flips: Vec<u32>) -> Result<JsValue, JsError> {
+    let data: Vec<bool> = data.into_iter().map(|b| b != 0).collect();
+    let flips: Vec<usize> = flips.into_iter().map(|p| p as usize).collect();
+    to_js(&parity::parity2d_run(&data, rows as usize, cols as usize, &flips)?)
 }

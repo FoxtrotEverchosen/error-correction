@@ -2,9 +2,11 @@ import "./style.css";
 import { initCore } from "./core";
 import { el } from "./components";
 import { hammingPage } from "./pages/hamming";
+import { parityPage } from "./pages/parity";
+import { parity2dPage } from "./pages/parity2d";
 import type { Page } from "./pages/page";
 
-const pages: Page[] = [hammingPage];
+const pages: Page[] = [parityPage, parity2dPage, hammingPage];
 
 function renderNav(active: Page) {
   const nav = document.getElementById("nav")!;

@@ -1,5 +1,5 @@
-import init, { hamming_run, channel_bsc, channel_burst, parity_run, parity2d_run, compare_sweep } from "ecc-wasm";
-import type { HammingTrace, ParityTrace, Parity2dTrace, SweepPoint } from "./types";
+import init, { hamming_run, channel_bsc, channel_burst, parity_run, parity2d_run, compare_sweep, crc_run } from "ecc-wasm";
+import type { HammingTrace, ParityTrace, Parity2dTrace, SweepPoint, CrcTrace } from "./types";
 
 const toBytes = (data: boolean[]) => Uint8Array.from(data, (b) => (b ? 1 : 0));
 
@@ -37,4 +37,8 @@ export function runParity2d(data: boolean[], rows: number, cols: number, flips: 
 
 export function runCompare(bers: number[], burstLen: number, trials: number, seed: bigint): SweepPoint[] {
   return compare_sweep(Float64Array.from(bers), burstLen, trials, seed) as SweepPoint[];
+}
+
+export function runCrc(data: boolean[], poly: number, width: number, flips: number[]): CrcTrace {
+  return crc_run(toBytes(data), poly, width, Uint32Array.from(flips)) as CrcTrace;
 }

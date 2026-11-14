@@ -77,3 +77,26 @@ export interface SweepPoint {
   trials: number;
   schemes: SchemeStats[];
 }
+
+export interface DivStep {
+  offset: number;
+  xored: boolean;
+  row: boolean[];
+}
+
+export type CrcVerdict = { kind: "no_error_detected" } | { kind: "error_detected" };
+
+export interface CrcTrace {
+  width: number;
+  generator: boolean[];
+  data: boolean[];
+  crc: boolean[];
+  codeword: boolean[];
+  encode_steps: DivStep[];
+  received: boolean[];
+  flipped: number[];
+  check_steps: DivStep[];
+  remainder: boolean[];
+  verdict: CrcVerdict;
+  undetected_error: boolean;
+}

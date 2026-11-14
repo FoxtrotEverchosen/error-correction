@@ -85,8 +85,13 @@ fn generator_bits(poly: u64, width: usize) -> Vec<bool> {
 
 /// Long division over GF(2), in place. One step per quotient position; the
 /// remainder ends up in the last `generator.len() - 1` bits of `bits`.
-fn divide(bits: &mut [bool], generator: &[bool], steps: usize) -> Vec<DivStep> {
-    let mut trace = Vec::with_capacity(steps);
+/// `on_step(offset, xored, bits)` is called after each step.
+fn divide_with(
+    bits: &mut [bool],
+    generator: &[bool],
+    steps: usize,
+    mut on_step: impl FnMut(usize, bool, &[bool]),
+) {
     for i in 0..steps {
         let xored = bits[i];
         if xored {
@@ -94,10 +99,55 @@ fn divide(bits: &mut [bool], generator: &[bool], steps: usize) -> Vec<DivStep> {
                 bits[i + j] ^= g;
             }
         }
-        trace.push(DivStep { offset: i, xored, row: bits.to_vec() });
+        on_step(i, xored, &*bits);
     }
+}
+
+/// Same division, recording every step for the UI.
+fn divide(bits: &mut [bool], generator: &[bool], steps: usize) -> Vec<DivStep> {
+    let mut trace = Vec::with_capacity(steps);
+    divide_with(bits, generator, steps, |offset, xored, row| {
+        trace.push(DivStep { offset, xored, row: row.to_vec() });
+    });
     trace
 }
+
+fn check_params(poly: u64, width: usize) -> Result<(), CrcError> {
+    if width == 0 || width > MAX_WIDTH {
+        return Err(CrcError::BadWidth { width });
+    }
+    if poly >> width != 0 {
+        return Err(CrcError::PolyTooWide { poly, width });
+    }
+    Ok(())
+}
+
+/// CRC of `data` without recording the division steps. Same math as `crc_run`,
+/// but lightweight; used by the Compare simulation.
+pub fn crc_bits(data: &[bool], poly: u64, width: usize) -> Result<Vec<bool>, CrcError> {
+    if data.is_empty() {
+        return Err(CrcError::EmptyData);
+    }
+    check_params(poly, width)?;
+    let generator = generator_bits(poly, width);
+    let mut work = data.to_vec();
+    work.resize(data.len() + width, false);
+    divide_with(&mut work, &generator, data.len(), |_, _, _| {});
+    Ok(work[data.len()..].to_vec())
+}
+
+/// True if `frame` (data followed by its CRC) leaves a zero remainder.
+pub fn crc_frame_passes(frame: &[bool], poly: u64, width: usize) -> Result<bool, CrcError> {
+    check_params(poly, width)?;
+    if frame.len() <= width {
+        return Err(CrcError::EmptyData);
+    }
+    let generator = generator_bits(poly, width);
+    let mut work = frame.to_vec();
+    divide_with(&mut work, &generator, frame.len() - width, |_, _, _| {});
+    Ok(work[frame.len() - width..].iter().all(|&b| !b))
+}
+
 
 pub fn crc_run(
     data: &[bool],
@@ -108,12 +158,9 @@ pub fn crc_run(
     if data.is_empty() {
         return Err(CrcError::EmptyData);
     }
-    if width == 0 || width > MAX_WIDTH {
-        return Err(CrcError::BadWidth { width });
-    }
-    if poly >> width != 0 {
-        return Err(CrcError::PolyTooWide { poly, width });
-    }
+
+    check_params(poly, width)?;
+
     let len = data.len() + width;
     let mut seen = vec![false; len];
     for &p in flips {
@@ -293,4 +340,57 @@ mod tests {
             CrcError::DuplicateFlip { position: 2 }
         );
     }
+
+    #[test]
+    fn lean_functions_agree_with_crc_run() {
+        for (width, poly) in [(3, 0b011), (8, 0x07), (16, 0x1021)] {
+            for seed in 0u32..32 {
+                let data: Vec<bool> = (0..16)
+                    .map(|i| (seed.wrapping_mul(2654435761) >> i) & 1 == 1)
+                    .collect();
+                let len = data.len() + width;
+                for flips in [vec![], vec![0], vec![1, len - 1], vec![0, 3, 7]] {
+                    let t = crc_run(&data, poly, width, &flips).unwrap();
+                    assert_eq!(crc_bits(&data, poly, width).unwrap(), t.crc);
+                    assert_eq!(
+                        crc_frame_passes(&t.received, poly, width).unwrap(),
+                        t.verdict == CrcVerdict::NoErrorDetected
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn lean_functions_reject_bad_input() {
+        assert_eq!(crc_bits(&[], 0x07, 8).unwrap_err(), CrcError::EmptyData);
+        assert_eq!(
+            crc_frame_passes(&[true; 3], 0b011, 3).unwrap_err(),
+            CrcError::EmptyData
+        );
+        assert_eq!(
+            crc_bits(&[true], 0, 33).unwrap_err(),
+            CrcError::BadWidth { width: 33 }
+        );
+    }
+
+    #[test]
+    fn crc8_detects_up_to_three_flips_in_a_24_bit_frame() {
+        // CRC is linear, so one message is enough: the check only depends on the error pattern.
+        let data = bits("1011001110001011");
+        let len = data.len() + 8;
+        let detected = |flips: &[usize]| {
+            crc_run(&data, 0x07, 8, flips).unwrap().verdict == CrcVerdict::ErrorDetected
+        };
+        for a in 0..len {
+            assert!(detected(&[a]));
+            for b in a + 1..len {
+                assert!(detected(&[a, b]));
+                for c in b + 1..len {
+                    assert!(detected(&[a, b, c]), "{a} {b} {c}");
+                }
+            }
+        }
+    }
+
 }

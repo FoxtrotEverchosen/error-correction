@@ -6,9 +6,10 @@ import { parityPage } from "./pages/parity";
 import { parity2dPage } from "./pages/parity2d";
 import { comparePage } from "./pages/compare";
 import { crcPage } from "./pages/crc";
+import { repetitionPage } from "./pages/repetition";
 import type { Page } from "./pages/page";
 
-const pages: Page[] = [parityPage, crcPage, parity2dPage, hammingPage, comparePage];
+const pages: Page[] = [parityPage, crcPage, repetitionPage, parity2dPage, hammingPage, comparePage];
 
 function renderNav(active: Page) {
   const nav = document.getElementById("nav")!;

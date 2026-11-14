@@ -54,7 +54,8 @@ export interface Parity2dTrace {
   decoded_correctly: boolean;
 }
 
-export type SchemeId = "uncoded" | "parity" | "parity2d" | "hamming" | "extended_hamming";
+export type SchemeId =
+  | "uncoded" | "parity" | "crc" | "parity2d" | "repetition" | "hamming" | "extended_hamming";
 
 export interface Counts {
   clean: number;
@@ -99,4 +100,27 @@ export interface CrcTrace {
   remainder: boolean[];
   verdict: CrcVerdict;
   undetected_error: boolean;
+}
+
+export interface GroupVote {
+  ones: number;
+  vote: boolean;
+  unanimous: boolean;
+  correct: boolean;
+}
+
+export type RepetitionVerdict =
+  | { kind: "no_error_detected" }
+  | { kind: "corrected"; groups: number };
+
+export interface RepetitionTrace {
+  copies: number;
+  data: boolean[];
+  codeword: boolean[];
+  received: boolean[];
+  flipped: number[];
+  groups: GroupVote[];
+  verdict: RepetitionVerdict;
+  decoded: boolean[];
+  decoded_correctly: boolean;
 }

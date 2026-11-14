@@ -1,6 +1,6 @@
 use wasm_bindgen::prelude::*;
 use ecc_core::utils::Xorshift64Star;
-use ecc_core::{hamming, channel, parity, compare, crc};
+use ecc_core::{hamming, channel, parity, compare, crc, repetition};
 use serde::Serialize;
 
 /// Serialize into plain JS objects (not `Map`s), with `None` as `null`.
@@ -61,4 +61,11 @@ pub fn crc_run(data: Vec<u8>, poly: u32, width: u32, flips: Vec<u32>) -> Result<
     let data: Vec<bool> = data.into_iter().map(|b| b != 0).collect();
     let flips: Vec<usize> = flips.into_iter().map(|p| p as usize).collect();
     to_js(&crc::crc_run(&data, u64::from(poly), width as usize, &flips)?)
+}
+
+#[wasm_bindgen]
+pub fn repetition_run(data: Vec<u8>, copies: u32, flips: Vec<u32>) -> Result<JsValue, JsError> {
+    let data: Vec<bool> = data.into_iter().map(|b| b != 0).collect();
+    let flips: Vec<usize> = flips.into_iter().map(|p| p as usize).collect();
+    to_js(&repetition::repetition_run(&data, copies as usize, &flips)?)
 }

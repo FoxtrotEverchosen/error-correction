@@ -3,6 +3,8 @@
 use crate::channel::{self, ChannelError};
 use crate::hamming::{self, HammingError, Verdict};
 use crate::parity::{self, Parity2dVerdict, ParityError, ParityVerdict};
+use crate::crc::{self, CrcError};
+use crate::repetition::{self, RepetitionError};
 use crate::utils::Xorshift64Star;
 use serde::Serialize;
 use std::fmt;
@@ -16,7 +18,11 @@ const GRID_COLS: usize = 4;
 const HAMMING_LEN: usize = 7;
 const EXTENDED_LEN: usize = 8;
 const HAMMING_BLOCKS: usize = PAYLOAD_BITS / hamming::DATA_BITS;
-const SCHEME_COUNT: usize = 5;
+const SCHEME_COUNT: usize = 7;
+const CRC_POLY: u64 = 0x07; // CRC-8: x^8 + x^2 + x + 1
+const CRC_WIDTH: usize = 8;
+const REPETITION_COPIES: usize = 3;
+
 const GOLDEN: u64 = 0x9E37_79B9_7F4A_7C15;
 
 const _: () = assert!(GRID_ROWS * GRID_COLS == PAYLOAD_BITS);
@@ -49,13 +55,27 @@ impl From<ChannelError> for CompareError {
         Self::Channel(e)
     }
 }
+
 impl From<HammingError> for CompareError {
     fn from(e: HammingError) -> Self {
         Self::Codec(e.to_string())
     }
 }
+
 impl From<ParityError> for CompareError {
     fn from(e: ParityError) -> Self {
+        Self::Codec(e.to_string())
+    }
+}
+
+impl From<CrcError> for CompareError {
+    fn from(e: CrcError) -> Self {
+        Self::Codec(e.to_string())
+    }
+}
+
+impl From<RepetitionError> for CompareError {
+    fn from(e: RepetitionError) -> Self {
         Self::Codec(e.to_string())
     }
 }
@@ -65,16 +85,21 @@ impl From<ParityError> for CompareError {
 pub enum Scheme {
     Uncoded,
     Parity,
+    Crc,
     Parity2d,
+    Repetition,
     Hamming,
     ExtendedHamming,
 }
 
 impl Scheme {
+    /// Display order: no coding, detection only, then correcting codes.
     pub const ALL: [Scheme; SCHEME_COUNT] = [
         Scheme::Uncoded,
         Scheme::Parity,
+        Scheme::Crc,
         Scheme::Parity2d,
+        Scheme::Repetition,
         Scheme::Hamming,
         Scheme::ExtendedHamming,
     ];
@@ -83,7 +108,9 @@ impl Scheme {
         match self {
             Scheme::Uncoded => "Uncoded",
             Scheme::Parity => "Parity bit",
+            Scheme::Crc => "CRC-8",
             Scheme::Parity2d => "2D parity (4x4)",
+            Scheme::Repetition => "Repetition (3x)",
             Scheme::Hamming => "Hamming (7,4)",
             Scheme::ExtendedHamming => "Extended Hamming (8,4)",
         }
@@ -94,9 +121,25 @@ impl Scheme {
         match self {
             Scheme::Uncoded => PAYLOAD_BITS,
             Scheme::Parity => PAYLOAD_BITS + 1,
+            Scheme::Crc => PAYLOAD_BITS + CRC_WIDTH,
             Scheme::Parity2d => (GRID_ROWS + 1) * (GRID_COLS + 1),
+            Scheme::Repetition => PAYLOAD_BITS * REPETITION_COPIES,
             Scheme::Hamming => HAMMING_BLOCKS * HAMMING_LEN,
             Scheme::ExtendedHamming => HAMMING_BLOCKS * EXTENDED_LEN,
+        }
+    }
+
+    /// Fixed per-scheme constant for the channel RNG seed, so adding schemes
+    /// or reordering `ALL` never changes the results of the others.
+    fn salt(self) -> u64 {
+        match self {
+            Scheme::Uncoded => 1,
+            Scheme::Parity => 2,
+            Scheme::Parity2d => 3,
+            Scheme::Hamming => 4,
+            Scheme::ExtendedHamming => 5,
+            Scheme::Repetition => 6,
+            Scheme::Crc => 7,
         }
     }
 }
@@ -229,6 +272,25 @@ fn simulate(
             };
             combine(any_flips, &[block])
         }
+        Scheme::Crc => {
+            let crc_bits = crc::crc_bits(payload, CRC_POLY, CRC_WIDTH)?;
+            let mut frame = payload.to_vec();
+            frame.extend_from_slice(&crc_bits);
+            for &p in flips {
+                frame[p] = !frame[p];
+            }
+            let block = if crc::crc_frame_passes(&frame, CRC_POLY, CRC_WIDTH)? {
+                BlockResult::Delivered { correct: frame[..PAYLOAD_BITS] == payload[..] }
+            } else {
+                BlockResult::Detected
+            };
+            combine(any_flips, &[block])
+        }
+        Scheme::Repetition => {
+            let t = repetition::repetition_run(payload, REPETITION_COPIES, flips)?;
+            combine(any_flips, &[BlockResult::Delivered { correct: t.decoded_correctly }])
+        }
+
         Scheme::Hamming | Scheme::ExtendedHamming => {
             let table = &tables[usize::from(scheme == Scheme::ExtendedHamming)];
             let blocks: [BlockResult; HAMMING_BLOCKS] = std::array::from_fn(|c| {
@@ -268,9 +330,11 @@ fn run_point(
     // Every scheme sees the same payload sequence and its own channel stream.
     // The seeds don't depend on `ber`, so flips at a higher rate include those at a lower one.
     let mut payload_rng = make_rng(seed);
-    let mut channel_rngs: Vec<Xorshift64Star> = (0..SCHEME_COUNT)
-        .map(|i| make_rng(seed ^ GOLDEN.wrapping_mul(i as u64 + 1)))
+    let mut channel_rngs: Vec<Xorshift64Star> = Scheme::ALL
+        .iter()
+        .map(|s| make_rng(seed ^ GOLDEN.wrapping_mul(s.salt())))
         .collect();
+ 
     let mut counts = [Counts::default(); SCHEME_COUNT];
 
     for _ in 0..trials {
@@ -374,6 +438,8 @@ mod tests {
         assert_eq!(sent(Scheme::Parity2d), 25);
         assert_eq!(sent(Scheme::Hamming), 28);
         assert_eq!(sent(Scheme::ExtendedHamming), 32);
+        assert_eq!(sent(Scheme::Crc), 24);
+        assert_eq!(sent(Scheme::Repetition), 48);
         assert!((stats(&p, Scheme::Hamming).code_rate - 16.0 / 28.0).abs() < 1e-12);
     }
 
@@ -415,4 +481,27 @@ mod tests {
             CompareError::Channel(ChannelError::InvalidBer(1.5))
         );
     }
+
+    #[test]
+    fn crc_never_corrects_and_repetition_never_detects() {
+        let p = point(0.05, 1, 5000, 3);
+        assert_eq!(stats(&p, Scheme::Crc).counts.corrected, 0);
+        assert_eq!(stats(&p, Scheme::Repetition).counts.detected, 0);
+    }
+
+    #[test]
+    fn matches_theory_for_crc_and_repetition() {
+        // BER 0.02. CRC-8: clean = 0.98^24 = 61.6%, silent errors are rare (about 1 in 256 of corrupted frames).
+        // Repetition 3x: clean = 0.98^48 = 37.9%; a bit decodes wrong with probability
+        // 3p^2(1-p) + p^3 = 0.118%, so silent = 1 - (1 - 0.00118)^16 = 1.9% and corrected = 60.2%.
+        // Bounds are about 4 sigma wide.
+        let p = point(0.02, 1, 20_000, 11);
+        let crc = stats(&p, Scheme::Crc).counts;
+        assert!((0.60..0.632).contains(&frac(crc.clean, &p)));
+        assert!(frac(crc.silent, &p) < 0.01);
+        let rep = stats(&p, Scheme::Repetition).counts;
+        assert!((0.014..0.024).contains(&frac(rep.silent, &p)));
+        assert!((0.588..0.616).contains(&frac(rep.corrected, &p)));
+    }
+
 }

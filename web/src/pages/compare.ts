@@ -167,7 +167,7 @@ export const comparePage: Page = {
               class: "note",
               text:
                 "Each point is a Monte Carlo estimate. Outcomes rarer than about 1 in N trials usually aren't observed, so those points are left out and the line breaks. " +
-                "In the silent-errors view, a steeper line means more bit errors are needed to fool the scheme: roughly 1 for uncoded, 2 for parity and Hamming, 3 for 2D parity and extended Hamming.",
+                "In the silent-errors view, a steeper line means more simultaneous bit errors are needed to fool the scheme: roughly 1 for uncoded, 2 for parity, Hamming and repetition, 3 for 2D parity and extended Hamming, and 4 for CRC-8.",
             }),
           ),
         );
@@ -190,8 +190,10 @@ export const comparePage: Page = {
         class: "note",
         text:
           "Every trial sends the same random 16-bit payload through each scheme over the same kind of noisy channel. " +
-          "Uncoded: the 16 bits as they are. Parity: one parity bit over all 16. 2D parity: one 4x4 grid (25 bits). " +
+          "Uncoded: the 16 bits as they are. Parity: one parity bit over all 16. CRC-8: 8 CRC bits appended (detection only). " +
+          "2D parity: one 4x4 grid (25 bits). Repetition: every bit sent 3 times with a majority vote (48 bits). " +
           "Hamming and Extended Hamming: four codewords of 7 or 8 bits sent back to back, so a burst can span two of them.",
+
       }),
       section(
         "Channel and simulation",

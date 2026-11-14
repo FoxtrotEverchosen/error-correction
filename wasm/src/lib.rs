@@ -1,6 +1,6 @@
 use wasm_bindgen::prelude::*;
 use ecc_core::utils::Xorshift64Star;
-use ecc_core::{hamming, channel, parity};
+use ecc_core::{hamming, channel, parity, compare};
 use serde::Serialize;
 
 /// Serialize into plain JS objects (not `Map`s), with `None` as `null`.
@@ -48,4 +48,10 @@ pub fn parity2d_run(data: Vec<u8>, rows: u32, cols: u32, flips: Vec<u32>) -> Res
     let data: Vec<bool> = data.into_iter().map(|b| b != 0).collect();
     let flips: Vec<usize> = flips.into_iter().map(|p| p as usize).collect();
     to_js(&parity::parity2d_run(&data, rows as usize, cols as usize, &flips)?)
+}
+
+#[wasm_bindgen]
+pub fn compare_sweep(bers: Vec<f64>, burst_len: u32, trials: u32, seed: u64) -> Result<JsValue, JsError> {
+    let points = compare::compare_sweep(&bers, burst_len as usize, trials as usize, seed)?;
+    to_js(&points)
 }

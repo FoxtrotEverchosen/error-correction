@@ -47,6 +47,35 @@ pub fn burst_flips(len: usize, burst_len: usize, rng: &mut Xorshift64Star) -> Ve
     (start..start + burst_len).collect()
 }
 
+/// Clustered errors with (approximately) the same average bit error rate as
+/// `bsc_flips`: each bit starts a burst of `burst_len` consecutive flips with
+/// probability `ber / burst_len`. Overlapping bursts cancel (XOR) and bursts
+/// are clamped to the end of the stream, so the real average rate is slightly
+/// lower at high `ber`. `burst_len = 1` is exactly `bsc_flips`.
+/// Sorted, unique, 0-indexed positions.
+pub fn clustered_flips(
+    len: usize,
+    ber: f64,
+    burst_len: usize,
+    rng: &mut Xorshift64Star,
+) -> Result<Vec<usize>, ChannelError> {
+    if !(0.0..=1.0).contains(&ber) {
+        return Err(ChannelError::InvalidBer(ber));
+    }
+    let burst_len = burst_len.max(1);
+    let start_p = ber / burst_len as f64;
+    let mut hit = vec![false; len];
+    for start in 0..len {
+        if next_unit(rng) < start_p {
+            for slot in &mut hit[start..(start + burst_len).min(len)] {
+                *slot = !*slot;
+            }
+        }
+    }
+    Ok((0..len).filter(|&i| hit[i]).collect())
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -97,5 +126,25 @@ mod tests {
         assert!(burst_flips(8, 0, &mut rng).is_empty());
         assert!(burst_flips(0, 3, &mut rng).is_empty());
         assert_eq!(burst_flips(5, 99, &mut rng), vec![0, 1, 2, 3, 4]); // clamped
+    }
+
+    #[test]
+    fn clustered_with_burst_one_equals_bsc() {
+        let a = clustered_flips(500, 0.1, 1, &mut Xorshift64Star::new(9)).unwrap();
+        let b = bsc_flips(500, 0.1, &mut Xorshift64Star::new(9)).unwrap();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn clustered_basic_properties() {
+        let mut rng = Xorshift64Star::new(3);
+        assert!(clustered_flips(100, 0.0, 4, &mut rng).unwrap().is_empty());
+        assert!(clustered_flips(100, -0.5, 4, &mut rng).is_err());
+        let flips = clustered_flips(1000, 0.1, 4, &mut rng).unwrap();
+        assert!(flips.windows(2).all(|w| w[0] < w[1]));
+        assert!(flips.iter().all(|&p| p < 1000));
+        // Clustering shows up as adjacent flips.
+        let adjacent = flips.windows(2).filter(|w| w[1] == w[0] + 1).count();
+        assert!(adjacent * 2 > flips.len(), "{adjacent} adjacent of {}", flips.len());
     }
 }

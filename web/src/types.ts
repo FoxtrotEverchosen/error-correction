@@ -53,3 +53,27 @@ export interface Parity2dTrace {
   decoded: boolean[];
   decoded_correctly: boolean;
 }
+
+export type SchemeId = "uncoded" | "parity" | "parity2d" | "hamming" | "extended_hamming";
+
+export interface Counts {
+  clean: number;
+  corrected: number;
+  detected: number;
+  silent: number;
+}
+
+export interface SchemeStats {
+  id: SchemeId;
+  name: string;
+  data_bits: number;
+  sent_bits: number;
+  code_rate: number;
+  counts: Counts;
+}
+
+export interface SweepPoint {
+  ber: number;
+  trials: number;
+  schemes: SchemeStats[];
+}

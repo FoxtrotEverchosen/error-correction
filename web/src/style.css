@@ -1,71 +1,76 @@
 :root {
   --bg: #fafafa; --fg: #1c1c1e; --muted: #6b7280; --panel: #ffffff; --border: #d4d4d8;
   --data: #2563eb; --parity: #ea580c; --ok: #15803d; --warn: #b45309; --bad: #b91c1c;
-  color-scheme: light dark;
+  color-scheme: light dark; --c-uncoded: #6b7280; --c-parity: #a855f7; --c-parity2d: #0891b2;
+  --c-hamming: #2563eb; --c-extended_hamming: #db2777; --clean: #9ca3af;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #18181b; --fg: #f4f4f5; --muted: #a1a1aa; --panel: #27272a; --border: #3f3f46;
     --data: #60a5fa; --parity: #fb923c; --ok: #4ade80; --warn: #fbbf24; --bad: #f87171;
+    --c-uncoded: #9ca3af; --c-parity: #c084fc; --c-parity2d: #22d3ee;
+    --c-hamming: #60a5fa; --c-extended_hamming: #f472b6; --clean: #71717a;
   }
 }
 
 * { box-sizing: border-box; }
 
 body { margin: 0; background: var(--bg); color: var(--fg); font-family: system-ui, sans-serif; }
-
 #app { display: flex; min-height: 100vh; }
-
 nav { width: 220px; padding: 1rem; border-right: 1px solid var(--border); background: var(--panel); }
-
 nav h1 { font-size: 1.2rem; margin: 0 0 1rem; }
-
 nav h2 { font-size: .75rem; text-transform: uppercase; color: var(--muted); margin: 1rem 0 .25rem; }
-
 nav a { display: block; padding: .3rem .5rem; border-radius: 4px; color: inherit; text-decoration: none; }
-
 nav a.active { background: var(--border); font-weight: 600; }
-
-main { flex: 1; padding: 1.5rem 2rem; max-width: 760px; }
-
+main { flex: 1; padding: 1.5rem 2rem; max-width: 960px; }
 section { margin: 1.25rem 0; }
-
 h3 { font-size: .95rem; margin: 0 0 .5rem; }
 
 .bits { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: .5rem; }
-
 .bit { display: flex; flex-direction: column; align-items: center; width: 2.6rem; padding: .35rem 0; 
   border: 2px solid var(--border); border-radius: 6px; background: var(--panel); color: inherit; font: inherit; }
-
 .bit.data { border-color: var(--data); }
-
 .bit.parity { border-color: var(--parity); }
-
 .bit.fail { background: color-mix(in srgb, var(--warn) 20%, var(--panel)); }
-
 .grid { display: grid; gap: .4rem; width: max-content; margin-bottom: .5rem; }
-
 .bit.flipped { background: color-mix(in srgb, var(--bad) 25%, var(--panel)); }
-
 .bit.highlight { outline: 3px solid var(--ok); }
-
 .bit.clickable { cursor: pointer; }
-
 .bit.clickable:hover { filter: brightness(1.15); }
-
 .bit-value { font: 1.3rem ui-monospace, monospace; }
-
 .bit-label { font-size: .7rem; color: var(--muted); min-height: 1em;}
-
 .badge { display: inline-block; padding: .15rem .6rem; border-radius: 999px; font-size: .85rem; font-weight: 600; color: #fff; }
-
 .badge.ok { background: var(--ok); } .badge.warn { background: var(--warn); } .badge.bad { background: var(--bad); }
-
 .option { display: block; margin: .5rem 0; }
-
 .checks { list-style: none; padding: 0; } .checks li { margin: .25rem 0; }
-
 .note, .error { color: var(--muted); }
-
 .error { color: var(--bad); }
+
+.s-uncoded { color: var(--c-uncoded); }
+.s-parity { color: var(--c-parity); }
+.s-parity2d { color: var(--c-parity2d); }
+.s-hamming { color: var(--c-hamming); }
+.s-extended_hamming { color: var(--c-extended_hamming); }
+
+.chart { width: 100%; max-width: 640px; height: auto; }
+.chart-text { fill: var(--muted); font-size: 12px; }
+.grid-line { stroke: var(--border); }
+.line { fill: none; stroke: currentColor; stroke-width: 2; }
+.dot { fill: currentColor; }
+.legend { display: flex; flex-wrap: wrap; gap: .25rem 1rem; margin: .5rem 0; }
+.legend-item { display: inline-flex; align-items: center; gap: .35rem; }
+.legend-text { color: var(--fg); }
+.swatch { width: .9rem; height: .9rem; border-radius: 3px; background: currentColor; }
+
+table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+th, td { text-align: left; padding: .4rem .6rem; border-bottom: 1px solid var(--border); }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.stack { display: flex; width: 160px; height: .9rem; border-radius: 4px; overflow: hidden; background: var(--border); }
+.seg { min-width: 2px; }
+.seg.clean { background: var(--clean); }
+.seg.corrected { background: var(--ok); }
+.seg.detected { background: var(--warn); }
+.seg.silent { background: var(--bad); }
+.defs { color: var(--muted); font-size: .9rem; padding-left: 1.2rem; }
+select { font: inherit; }

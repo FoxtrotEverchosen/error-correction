@@ -1,8 +1,36 @@
-import init, {hello} from "ecc-wasm";
+import "./style.css";
+import { initCore } from "./core";
+import { el } from "./components";
+import { hammingPage } from "./pages/hamming";
+import type { Page } from "./pages/page";
 
-async function main() {
-  await init();
-  console.log(hello(42n));
+const pages: Page[] = [hammingPage];
+
+function renderNav(active: Page) {
+  const nav = document.getElementById("nav")!;
+  nav.replaceChildren(el("h1", { text: "ECC Lab" }));
+  for (const group of new Set(pages.map((p) => p.group))) {
+    nav.append(el("h2", { text: group }));
+    for (const p of pages.filter((q) => q.group === group)) {
+      const link = el("a", { class: p === active ? "active" : "", text: p.title });
+      link.href = `#${p.id}`;
+      nav.append(link);
+    }
+  }
 }
 
-main();
+function route() {
+  const id = location.hash.slice(1);
+  const page = pages.find((p) => p.id === id) ?? pages[0];
+  renderNav(page);
+  const main = document.getElementById("main")!;
+  main.replaceChildren();
+  page.mount(main);
+}
+
+async function start() {
+  await initCore();
+  window.addEventListener("hashchange", route);
+  route();
+}
+start();
